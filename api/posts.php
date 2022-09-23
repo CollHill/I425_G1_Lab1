@@ -1,6 +1,4 @@
 <?php
-
-//echo "Posts will come here.";
 $url = $_SERVER['REQUEST_URI'];
 
 // checking if slash is first character in route otherwise add it
@@ -11,7 +9,6 @@ if(strpos($url, "/") !== 0) {
 //Connect to the database.
 $dbInstance = new DB();
 $dbConn = $dbInstance->connect($db);
-
 
 header("Content-Type:application/json");
 if ($url == '/posts' && $_SERVER['REQUEST_METHOD'] == 'GET') {
@@ -67,7 +64,7 @@ function addPost($input, $db)
 }
 
 //Get a single post
-if(preg_match("/posts\/([0-9])+/", $url, $matches) && $_SERVER['REQUEST_METHOD']
+if(preg_match("/posts\/([0-9])*/", $url, $matches) && !preg_match("/comments/", $url) &&  $_SERVER['REQUEST_METHOD']
     == 'GET'){
     $postId = $matches[1];
     $post = getPost($dbConn, $postId);
@@ -159,3 +156,75 @@ function deletePost($db, $id) {
     $db->query($statement);
 }
 
+////////////////////////////////////////
+//                                    //
+//      Lab 1 code starts here        //
+//                                    //
+////////////////////////////////////////
+
+// list all comments for a post
+//      GET      /posts/1/comments
+
+if(preg_match("/posts\/([0-9])\/comments/", $url, $matches) && $_SERVER['REQUEST_METHOD']
+    == 'GET'){
+    $postId = $matches[1];
+    $comments = getComments($dbConn, $postId);
+    echo json_encode($comments);
+}
+
+/**
+ * Get Post based on ID
+ *
+ * @param $db
+ * @param $id
+ *
+ * @return Associative Array
+ */
+function getComments($db, $id) {
+    $statement = "SELECT * FROM comments WHERE post_id = " . $id;
+    $result = $db->query($statement);
+    if ($result && $result->num_rows > 0) {
+        $posts = array();
+        while ($result_row = $result->fetch_assoc()) {
+            $comment = array('id' => $result_row['id'],
+                'comment' => $result_row['comment'],
+                'post_id' => $result_row['post_id'],
+                'user_id' => $result_row['user_id']);
+            $comments[] = $comment;
+        }
+    }
+    return $comments;
+}
+
+// create a comment
+//      POST      /posts/1/comments
+
+if(preg_match("/posts\/([0-9])\/comments/", $url, $matches) && $_SERVER['REQUEST_METHOD']
+    == 'POST'){
+    $input = $_POST;
+    $postId = $matches[1];
+    $commentId = addComment($input, $dbConn, $postId);
+    if ($commentId) {
+        $input['id'] = $commentId;
+        $input['link'] = "/comments/$commentId";
+    }
+    echo json_encode($input);
+}
+
+/**
+ * Add comment
+ *
+ * @param $input
+ * @param $db
+ * @param $postId
+ * @return integer
+ */
+function addComment($input, $db, $postId)
+{
+    $comment = $input['comment'];
+    $users_id = $input['user_id'];
+    $statement = "INSERT INTO comments (comment, post_id, user_id)
+                    VALUES ('$comment', '$postId', $users_id)";
+    $db->query($statement);
+    return $db->insert_id;
+}
